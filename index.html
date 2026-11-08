@@ -29,6 +29,13 @@ h1{margin:0;font-size:clamp(44px,13vw,86px);font-weight:800;background:linear-gr
 .btn{margin-top:12px;padding:15px 38px;border:2px solid #0ff;border-radius:999px;color:#0ff;font-weight:800;letter-spacing:.25em;box-shadow:0 0 18px #0ff,inset 0 0 12px rgba(0,255,255,.4);animation:pulse .9375s infinite;cursor:pointer}
 @keyframes pulse{0%,100%{transform:scale(1)}12%{transform:scale(1.08)}}
 .hidden{display:none!important}
+.overlay{overflow-y:auto;justify-content:safe center}
+.btn.alt{border-color:#ffe46b;color:#ffe46b;box-shadow:0 0 14px rgba(255,228,107,.6),inset 0 0 10px rgba(255,228,107,.3);animation:none;padding:10px 26px;font-size:13px;margin-top:0}
+.board{font-size:11px;letter-spacing:.08em;border-collapse:collapse;color:#cfeff8;margin:0 auto}
+.board td{padding:3px 8px;text-align:right}
+.board td.h{opacity:.55}
+.board tr.me td{color:#ffe46b;text-shadow:0 0 8px #ffb400}
+#midSub{font-size:9px;margin-top:2px}
 #flash{position:fixed;inset:0;pointer-events:none;background:#ff2bd6;opacity:0;z-index:4}
 #autoTag{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.3em;color:#ffe46b;opacity:.7;pointer-events:none}
 </style>
@@ -40,7 +47,7 @@ h1{margin:0;font-size:clamp(44px,13vw,86px);font-weight:800;background:linear-gr
 <div id="prog"><i id="progBar"></i></div>
 <div id="hud">
   <div><div class="lbl">SCORE</div><div class="val" id="score">0</div></div>
-  <div id="bpmBox"><div class="lbl">BPM</div><div class="val" id="bpm">128</div></div>
+  <div id="bpmBox"><div class="lbl" id="midLbl">BPM</div><div class="val" id="bpm">128</div><div class="lbl" id="midSub"></div></div>
   <div id="comboBox"><div class="lbl">COMBO</div><div class="val" id="combo">0</div></div>
 </div>
 <div id="judge"></div>
@@ -51,15 +58,18 @@ h1{margin:0;font-size:clamp(44px,13vw,86px);font-weight:800;background:linear-gr
   <div class="stage" id="stageName">STAGE</div>
   <div class="sub">TAP / SPACE TO JUMP ON THE PING<br>
     <b style="color:#ff2b6a">RED WALLS</b> → JUMP &nbsp;·&nbsp; <b style="color:#ff9a1c">ORANGE CRUSHERS</b> → DON'T JUMP<br>
-    <b style="color:#6bff9e">GREEN PORTALS</b> FLIP GRAVITY<br>🔊 SOUND ON</div>
+    <b style="color:#6bff9e">GREEN PORTALS</b> FLIP GRAVITY<br><span id="modeInfo"></span>🔊 SOUND ON</div>
   <div class="btn" id="startBtn">START</div>
+  <div class="btn alt" id="modeBtn">⚡ CHALLENGE MODE</div>
+  <div id="startBoard" class="hidden"></div>
   <a class="sub" id="editLink" href="editor.html" style="color:#8ff;margin-top:6px">✎ STAGE EDITOR</a>
 </div>
 <div class="overlay hidden" id="overScreen">
-  <div class="sub">SIGNAL LOST</div>
+  <div class="sub" id="overTitle">SIGNAL LOST</div>
   <div class="big" id="finalScore">0</div>
   <div class="sub" id="reachLine">REACHED 0%</div>
   <div class="sub" id="bestLine">BEST 0</div>
+  <div id="overBoard"></div>
   <div class="btn" id="retryBtn">RETRY</div>
 </div>
 <div class="overlay hidden" id="clearScreen">
@@ -153,7 +163,10 @@ function practiceSlice(st, from) {
 const hashP = new URLSearchParams(location.hash.slice(1));
 const CUSTOM = hashP.has('s') ? sanitizeStage(decodeStage(hashP.get('s'))) : null;
 const FROM = Math.max(0, Math.floor(+hashP.get('from') || 0));
-const STAGE = practiceSlice(CUSTOM || BUILTIN_STAGE, FROM);
+const CHALLENGE = hashP.get('mode') === 'challenge';
+const STAGE = CHALLENGE
+  ? { id: 'challenge', name: 'CHALLENGE', bpm: 128, cam: 'left', seed: 1, bars: [], checkpoints: [] }
+  : practiceSlice(CUSTOM || BUILTIN_STAGE, FROM);
 const G0 = STAGE.startG || 1, PRACTICE = !!STAGE.practiceFrom;
 addEventListener('hashchange', () => location.reload());
 
@@ -162,7 +175,7 @@ const L = 8, H = 2.4, W = 3, T = .6;           // L = track units per beat (bigg
 const GB = 8 * H, VYB = 4 * H;                 // gravity & jump speed in units/beat
 const JUMP = new Set(['G', 'B', 'M', 'U']);
 const RUNWAY = 10;                             // bars of empty floor after the finish
-const nBars = STAGE.bars.length, endBeat = nBars * 4, endS = endBeat * L;
+const nBars = CHALLENGE ? Infinity : STAGE.bars.length, endBeat = nBars * 4, endS = endBeat * L;
 const cpByBar = {}; for (const c of STAGE.checkpoints) cpByBar[c.bar] = c;
 let totalJumps = 0, totalDodges = 0;
 for (const b of STAGE.bars) for (const c of b) { if (JUMP.has(c)) totalJumps++; else if (c === 'D') totalDodges++; }
@@ -170,10 +183,14 @@ const AUTO = new URLSearchParams(location.search).has('auto') || hashP.has('auto
 
 // ---------- tempo map ----------
 const tempo = [];
-{ let b = 0, t = 0, spb = 60 / STAGE.bpm; tempo.push({ b, t, spb, bpm: STAGE.bpm });
+function buildTempo() {
+  tempo.length = 0;
+  let b = 0, t = 0, spb = 60 / STAGE.bpm; tempo.push({ b, t, spb, bpm: STAGE.bpm });
   for (const c of [...STAGE.checkpoints].sort((a, z) => a.bar - z.bar)) if (c.bpm) {
     const nb = c.bar * 4; t += (nb - b) * spb; b = nb; spb = 60 / c.bpm; tempo.push({ b, t, spb, bpm: c.bpm });
-  } }
+  }
+}
+buildTempo();
 function segB(b) { let s = tempo[0]; for (const x of tempo) { if (x.b <= b) s = x; else break; } return s; }
 const spbAt = b => segB(Math.max(0, b)).spb;
 const bpmAt = b => segB(Math.max(0, b)).bpm;
@@ -210,20 +227,24 @@ const dl = new THREE.DirectionalLight(0xffffff, 1.1); dl.position.set(4, 10, 6);
 
 // ---------- backdrop ----------
 const sunCv = document.createElement('canvas'); sunCv.width = sunCv.height = 512;
-{ const g = sunCv.getContext('2d');
+const sunTex = new THREE.CanvasTexture(sunCv); sunTex.colorSpace = THREE.SRGBColorSpace;
+function drawSun(stops) {
+  const g = sunCv.getContext('2d');
+  g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, 512, 512);
   const gr = g.createLinearGradient(0, 0, 0, 512);
-  gr.addColorStop(0, '#ffe46b'); gr.addColorStop(.5, '#ff4fa0'); gr.addColorStop(1, '#9a1cff');
+  gr.addColorStop(0, stops[0]); gr.addColorStop(.5, stops[1]); gr.addColorStop(1, stops[2]);
   g.fillStyle = gr; g.beginPath(); g.arc(256, 256, 250, 0, Math.PI * 2); g.fill();
   g.globalCompositeOperation = 'destination-out';
   for (let i = 0; i < 9; i++) g.fillRect(0, 280 + i * 26, 512, 3 + i * 2.2);
+  sunTex.needsUpdate = true;
 }
-const sunTex = new THREE.CanvasTexture(sunCv); sunTex.colorSpace = THREE.SRGBColorSpace;
+drawSun(['#ffe46b', '#ff4fa0', '#9a1cff']);
 const sun = new THREE.Mesh(new THREE.PlaneGeometry(240, 240),
   new THREE.MeshBasicMaterial({ map: sunTex, transparent: true, fog: false, depthWrite: false, color: 0xcccccc }));
 sun.renderOrder = -1; scene.add(sun);
 
-const grid = new THREE.GridHelper(700, 110, 0xff2bd6, 0x6a1fb0);
-grid.material.transparent = true; grid.material.opacity = .45; scene.add(grid);
+const grid = new THREE.GridHelper(700, 110, 0xffffff, 0xffffff);
+grid.material.color.set(0x8a2bd0); grid.material.transparent = true; grid.material.opacity = .45; scene.add(grid);
 
 const starGeo = new THREE.BufferGeometry(); const sp = [];
 for (let i = 0; i < 1400; i++) sp.push((Math.random() - .5) * 500, Math.random() * 320 - 160, -Math.random() * 450);
@@ -236,6 +257,7 @@ const decor = [];
 const decoGeos = [new THREE.IcosahedronGeometry(1.6, 0), new THREE.OctahedronGeometry(1.5, 0), new THREE.TorusGeometry(1.4, .35, 6, 12), new THREE.TetrahedronGeometry(1.6, 0)];
 for (let i = 0; i < 26; i++) {
   const m = new THREE.Mesh(decoGeos[i % 4], new THREE.MeshBasicMaterial({ color: COLS[i % 3], wireframe: true, toneMapped: false }));
+  m.userData.ci = i % 3;
   m.userData.spin = new THREE.Vector3(Math.random(), Math.random(), Math.random()).multiplyScalar(1.2);
   scene.add(m); decor.push(m);
 }
@@ -274,8 +296,33 @@ const portalGeo = new THREE.TorusGeometry(1.5, .12, 8, 40), portalDiscGeo = new 
 const gateGeo = new THREE.TorusGeometry(2.7, .1, 6, 48, Math.PI), finishGeo = new THREE.TorusGeometry(3.4, .16, 6, 48, Math.PI);
 const gridCv = document.createElement('canvas'); gridCv.width = gridCv.height = 128;
 { const g = gridCv.getContext('2d'); g.fillStyle = '#120826'; g.fillRect(0, 0, 128, 128);
-  g.strokeStyle = '#2ee8ff'; g.lineWidth = 3; g.strokeRect(2, 2, 124, 124);
-  g.fillStyle = '#2ee8ff'; g.fillRect(60, 60, 8, 8); }
+  g.strokeStyle = '#ffffff'; g.lineWidth = 3; g.strokeRect(2, 2, 124, 124);
+  g.fillStyle = '#ffffff'; g.fillRect(60, 60, 8, 8); }
+const tileColor = new THREE.Color(0x2ee8ff);   // shared platform glow colour (themed)
+
+// ---------- colour themes (challenge mode rotates through these every level) ----------
+const THEMES = [
+  { name: 'SYNTHWAVE',   cols: [0x00f0ff, 0xff2bd6, 0xa45cff], bg: 0x07020f, fog: 0x0b0326, grid: 0x8a2bd0, tile: 0x2ee8ff, stars: 0xbfe8ff, sun: ['#ffe46b', '#ff4fa0', '#9a1cff'] },
+  { name: 'TOXIC',       cols: [0x7dff3a, 0xe8ff3a, 0x00ffa8], bg: 0x020a04, fog: 0x05160b, grid: 0x2a9a4a, tile: 0x7dff3a, stars: 0xd8ffc0, sun: ['#f4ff8a', '#7dff3a', '#008a5a'] },
+  { name: 'GLACIER',     cols: [0x9fe8ff, 0xffffff, 0x4a8cff], bg: 0x020814, fog: 0x071733, grid: 0x3a6ad0, tile: 0x9fe8ff, stars: 0xffffff, sun: ['#ffffff', '#9fe8ff', '#3a5aff'] },
+  { name: 'ULTRAVIOLET', cols: [0xb05cff, 0xff3af0, 0x5a3aff], bg: 0x06010f, fog: 0x12032a, grid: 0x6a20c0, tile: 0xc07cff, stars: 0xe0c8ff, sun: ['#ffb0ff', '#b05cff', '#3a10a0'] },
+  { name: 'DEEP SEA',    cols: [0x00b4ff, 0x3affff, 0x2a5aff], bg: 0x010812, fog: 0x021a2a, grid: 0x0a5a9a, tile: 0x3affff, stars: 0xc0f0ff, sun: ['#d0ffff', '#00b4ff', '#0a2a8a'] }
+];
+let themeTo = null, themeT = 0;
+function setTheme(i, instant) {
+  const th = THEMES[i % THEMES.length], C = c => new THREE.Color(c);
+  themeTo = { cols: th.cols.map(C), bg: C(th.bg), fog: C(th.fog), grid: C(th.grid), tile: C(th.tile), stars: C(th.stars) };
+  themeT = 0; drawSun(th.sun);
+  if (instant) applyTheme(1);
+}
+function applyTheme(k) {
+  const t = themeTo; if (!t) return;
+  COLS.forEach((c, i) => c.lerp(t.cols[i], k));
+  scene.background.lerp(t.bg, k); scene.fog.color.lerp(t.fog, k); grid.material.color.lerp(t.grid, k);
+  tileColor.lerp(t.tile, k); stars.material.color.lerp(t.stars, k);
+  for (const m of decor) m.material.color.copy(COLS[m.userData.ci]);
+  if (k >= 1) themeTo = null;
+}
 const gridTex = new THREE.CanvasTexture(gridCv);
 gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping; gridTex.colorSpace = THREE.SRGBColorSpace;
 const finCv = document.createElement('canvas'); finCv.width = 512; finCv.height = 128;
@@ -298,6 +345,7 @@ function buildPlatform(p) {
   const len = p.e - p.s, g = new THREE.Group();
   const tex = gridTex.clone(); tex.needsUpdate = true; tex.repeat.set(2, len / 1.5);
   const mat = new THREE.MeshStandardMaterial({ color: 0x2a1a4a, map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: .32, roughness: .35, metalness: .5 });
+  mat.emissive = tileColor;
   const box = new THREE.Mesh(new THREE.BoxGeometry(W, T, len), mat); box.position.y = -p.g * T / 2; g.add(box);
   const sg = new THREE.BoxGeometry(.08, .08, len), eg = new THREE.BoxGeometry(W, .08, .08);
   for (const sx of [-W / 2, W / 2]) { const st = new THREE.Mesh(sg, stripMats[p.c]); st.position.x = sx; g.add(st); }
@@ -344,11 +392,46 @@ function makeGate(i, cp, finish) {
   return o;
 }
 
+// ---------- challenge mode: endless random bars, level up at the first bar after every 30 s ----------
+const CH = { level: 0, nextT: 30, flipBars: 0, chain: 0, cam: 'left' };
+const LEVEL_SECS = 30;
+function pickW(pool) { let s = 0; for (const [, w] of pool) s += w; let r = Math.random() * s; for (const [c, w] of pool) if ((r -= w) < 0) return c; return pool[0][0]; }
+function challengeBar(bar) {
+  if (bar > 0 && secOfBeat(bar * 4) >= CH.nextT) {
+    CH.level++; CH.nextT += LEVEL_SECS;
+    const bpm = Math.min(196, 128 + CH.level * 7);
+    let cam; do cam = CAM_NAMES[Math.floor(Math.random() * CAM_NAMES.length)]; while (cam === CH.cam); CH.cam = cam;
+    cpByBar[bar] = { bar, bpm, cam, level: CH.level, theme: CH.level % THEMES.length };
+    const p = tempo[tempo.length - 1], nb = bar * 4;
+    tempo.push({ b: nb, t: p.t + (nb - p.b) * p.spb, spb: 60 / bpm, bpm });
+  }
+  if (bar < 2) return 'FFFF';
+  const lv = CH.level;
+  const density = Math.min(.72, .32 + lv * .06);           // chance a beat has something on it
+  const pool = [['G', 3], ['B', 2]];
+  if (lv >= 1) pool.push(['M', 2]);
+  if (lv >= 2) pool.push(['D', 1.4 + lv * .12]);
+  const maxChain = Math.min(8, 3 + lv);                     // longest run of back-to-back jumps
+  let s = '';
+  for (let k = 0; k < 4; k++) {
+    let c = Math.random() < density ? pickW(pool) : 'F';
+    if (lv >= 3 && JUMP.has(c)) {                           // gravity portals; once upside-down, flipping back gets likelier
+      const pU = gen.g < 0 ? Math.min(.6, .07 * CH.flipBars) : .05;
+      if (Math.random() < pU) c = 'U';
+    }
+    if (JUMP.has(c) && CH.chain >= maxChain) c = 'F';
+    CH.chain = JUMP.has(c) ? CH.chain + 1 : 0;
+    s += c;
+  }
+  CH.flipBars = gen.g < 0 ? CH.flipBars + 1 : 0;
+  return s;
+}
+
 function genBar() {
   if (gen.done) return;
   const bar = Math.floor(gen.i / 4);
   if (bar >= nBars + RUNWAY) { closePlatform(gen.i * L); gen.done = true; return; }
-  const pat = bar < nBars ? STAGE.bars[bar] : 'FFFF';
+  const pat = CHALLENGE ? challengeBar(bar) : bar < nBars ? STAGE.bars[bar] : 'FFFF';
   for (let k = 0; k < 4; k++) {
     const c = (pat[k] || 'F').toUpperCase(), i = gen.i; cells[i] = c;
     if (k === 0) {
@@ -420,6 +503,7 @@ function burst(n, x, y, z, mats, spread) {
 const P1 = {};
 let state = 'menu', score = 0, combo = 0, best = 0, lastT = 0, camY = 0, flipT = -1, deadAt = 0, clearAt = 0, perfectKick = 0;
 let camPreset = STAGE.cam, camSnap = true, camRoll = 0, cubeRoll = 0, fovKick = 0, bpmShown = 0;
+let chTime = 0, chLevel = 0, timeShown = '';
 const stats = { perfect: 0, great: 0, good: 0, dodge: 0, maxCombo: 0 };
 const bestKey = 'neonhop-best-' + STAGE.id;
 try { best = +localStorage.getItem(bestKey) || 0; } catch (e) {}
@@ -429,7 +513,14 @@ function resetWorld() {
   for (const o of props) scene.remove(o.mesh);
   for (const s of shards) scene.remove(s);
   plats = []; props = []; cells = []; shards = []; judged = new Set(); autoDone = new Set();
-  rng = mulberry32(STAGE.seed || 1);
+  if (CHALLENGE) {
+    Object.assign(CH, { level: 0, nextT: LEVEL_SECS, flipBars: 0, chain: 0, cam: STAGE.cam });
+    for (const k in cpByBar) delete cpByBar[k];
+    buildTempo();
+  }
+  chTime = 0; chLevel = 0; timeShown = ''; bpmShown = 0;
+  setTheme(0, true);
+  rng = mulberry32(CHALLENGE ? (Math.random() * 1e9) | 0 : STAGE.seed || 1);
   Object.assign(gen, { i: 0, open: null, x: 0, surf: 0, g: G0, color: 0, done: false });
   startPlatform(-6 * L);
   while (!gen.done && gen.i * L < 260) genBar();
@@ -516,7 +607,42 @@ $('stageName').textContent = STAGE.name + (PRACTICE ? ` · FROM BAR ${FROM + 1}`
 $('editLink').addEventListener('pointerdown', e => e.stopPropagation());
 if (AUTO) $('autoTag').classList.remove('hidden');
 function updateHud() { $('score').textContent = score; $('combo').textContent = combo >= 8 ? `${combo} ×${1 + Math.floor(combo / 8)}` : combo; }
-function setBpm(b) { if (b !== bpmShown) { bpmShown = b; $('bpm').textContent = b; } }
+function setBpm(b) {
+  if (b === bpmShown) return; bpmShown = b;
+  if (CHALLENGE) $('midSub').textContent = `LV ${chLevel + 1} · ${b} BPM`; else $('bpm').textContent = b;
+}
+const fmtTime = s => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+function setTime(s) { const txt = fmtTime(s); if (txt !== timeShown) { timeShown = txt; $('bpm').textContent = txt; } }
+
+// ---------- challenge top 10 (local browser storage) ----------
+const TOP_KEY = 'neonhop-challenge-top10';
+function loadTop() {
+  try { const a = JSON.parse(localStorage.getItem(TOP_KEY)); return Array.isArray(a) ? a.filter(r => r && isFinite(r.time)).slice(0, 10) : []; }
+  catch (e) { return []; }
+}
+function recordRun(time, sc, level) {
+  const top = loadTop(), entry = { time: +time.toFixed(2), score: sc, level, date: Date.now() };
+  top.push(entry); top.sort((a, b) => b.time - a.time || b.score - a.score);
+  const idx = top.indexOf(entry);
+  try { localStorage.setItem(TOP_KEY, JSON.stringify(top.slice(0, 10))); } catch (e) {}
+  return idx < 10 ? idx : -1;
+}
+function boardHtml(hl) {
+  const top = loadTop();
+  if (!top.length) return '<div class="sub">NO RUNS YET · BE THE FIRST</div>';
+  return '<div class="lbl" style="margin:4px 0 6px">TOP 10 · LONGEST SURVIVAL</div><table class="board">' +
+    top.map((r, i) => `<tr class="${i === hl ? 'me' : ''}"><td>#${i + 1}</td><td>${fmtTime(+r.time)}</td><td>${Math.floor(+r.score) || 0}</td><td>LV ${(Math.floor(+r.level) || 0) + 1}</td><td class="h">${new Date(+r.date || 0).toLocaleDateString()}</td></tr>`).join('') +
+    '</table>';
+}
+if (CHALLENGE) {
+  $('stageName').textContent = 'CHALLENGE · ENDLESS';
+  $('modeInfo').innerHTML = '<b style="color:#ffe46b">SURVIVE AS LONG AS YOU CAN</b><br>EVERY 30 S: NEW THEME · FASTER · HARDER<br>';
+  $('modeBtn').textContent = '◀ STAGE MODE';
+  $('startBoard').innerHTML = boardHtml(-1); $('startBoard').classList.remove('hidden');
+  $('midLbl').textContent = 'TIME'; $('bpm').textContent = '0:00.0'; $('midSub').textContent = 'LV 1 · 128 BPM';
+  $('prog').classList.add('hidden');
+}
+$('modeBtn').addEventListener('pointerdown', e => { e.stopPropagation(); location.href = CHALLENGE ? 'index.html' : 'index.html#mode=challenge'; });
 function showJudge(txt, col, sub = '') {
   judgeEl.innerHTML = txt + (sub ? `<small>${sub}</small>` : ''); judgeEl.style.color = col; judgeEl.style.textShadow = `0 0 18px ${col}`;
   judgeEl.animate([{ opacity: 1, transform: 'translate(-50%,-50%) scale(1.45)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)', offset: .2 }, { opacity: 0, transform: 'translate(-50%,-90%) scale(1)' }], { duration: 650, easing: 'ease-out' });
@@ -564,7 +690,10 @@ function hitGate(o) {
   if (cp.cam && cp.cam !== camPreset) { camPreset = cp.cam; camSnap = true; }
   fovKick = 1.2; score += 100 * mult(); updateHud();
   flash('#ffffff', .4, 260);
-  showJudge('CHECKPOINT', '#ffe46b', cp.bpm ? `${cp.bpm} BPM` : '');
+  if (cp.level !== undefined) {
+    chLevel = cp.level; bpmShown = 0; setTheme(cp.theme);
+    showJudge(`LEVEL ${cp.level + 1}`, '#ffe46b', `${THEMES[cp.theme % THEMES.length].name} · ${cp.bpm} BPM`);
+  } else showJudge('CHECKPOINT', '#ffe46b', cp.bpm ? `${cp.bpm} BPM` : '');
 }
 function die() {
   if (P1.dead || state !== 'play') return;
@@ -573,6 +702,18 @@ function die() {
   master.gain.cancelScheduledValues(ac.currentTime); master.gain.setTargetAtTime(0, ac.currentTime, .08);
   flash('#ff2bd6', .55, 450);
   burst(26, P1.x, P1.y + P1.g * .4, -P1.s, [stripMats[1], stripMats[0], stripMats[1]], 9);
+  if (CHALLENGE) {
+    const rank = AUTO ? -1 : recordRun(chTime, score, chLevel);
+    setTimeout(() => {
+      $('overTitle').textContent = 'YOU SURVIVED';
+      $('finalScore').textContent = fmtTime(chTime);
+      $('reachLine').textContent = `SCORE ${score} · LEVEL ${chLevel + 1}`;
+      $('bestLine').innerHTML = rank === 0 ? '<b style="color:#ffe46b">★ NEW RECORD ★</b>' : rank > 0 ? `<b style="color:#ffe46b">TOP 10 · #${rank + 1}</b>` : '';
+      $('overBoard').innerHTML = boardHtml(rank);
+      $('overScreen').classList.remove('hidden');
+    }, 1000);
+    return;
+  }
   saveBest();
   setTimeout(() => {
     $('finalScore').textContent = score; $('bestLine').textContent = `BEST ${best}`;
@@ -641,6 +782,7 @@ function update(t, dt) {
   if (AUTO) { const i = Math.floor(beat); if (JUMP.has(cells[i]) && !autoDone.has(i)) { autoDone.add(i); tryJump(); } }
   P1.buffer -= dt;
   setBpm(bpmAt(beat));
+  if (CHALLENGE) { chTime = Math.max(0, secOfBeat(beat)); setTime(chTime); }
   if (s > 0 && Math.floor(beat) !== Math.floor(prevBeat)) { score += 5; updateHud(); }
   if (beat >= endBeat) finish();
 }
@@ -697,6 +839,9 @@ function frame() {
     for (const m of shards) { m.userData.v.y -= 22 * rdt; m.position.addScaledVector(m.userData.v, rdt); m.rotation.x += rdt * 8; m.rotation.y += rdt * 6; }
   }
   const g = P1.g, vNow = L / spbAt(P1.beat);
+
+  // colour theme transition
+  if (themeTo) { themeT += rdt; applyTheme(themeT > 1.2 ? 1 : Math.min(1, rdt * 3.5)); }
 
   // beat pulse
   const ph = ((beatPos % 1) + 1) % 1, pulse = Math.exp(-ph * 5);

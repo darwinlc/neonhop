@@ -21,6 +21,19 @@ Every jump lasts exactly one beat. Hits are judged **Perfect / Great / Good**, a
 
 Gold **checkpoint gates** speed up the music (128 → 160 BPM in the built-in stage) and cut to a new camera angle. Reach the **FINISH** gate to get a rank from S to C.
 
+## Challenge mode
+
+Press **⚡ CHALLENGE MODE** on the start screen, or open [`#mode=challenge`](https://darwinlc.github.io/neonhop/#mode=challenge).
+
+- **Endless:** there's no finish line. The track is generated at random as you go.
+- **Survival time** is shown at the top of the screen. When you die, your time, score and level are saved to a **top 10** board. The board is sorted by time and kept in your browser's local storage.
+- **Level-ups:** at the first bar after every 30 seconds, you pass a gold gate and:
+  - the **color theme** changes (Synthwave → Toxic → Glacier → Ultraviolet → Deep Sea → …)
+  - the tempo rises by 7 BPM (up to 196)
+  - the camera cuts to a new angle
+  - obstacles get denser, and longer jump chains are allowed
+- **New obstacles unlock** as you go: pop-up walls at level 2, crushers at level 3, gravity portals at level 4.
+
 ## Stage editor
 
 `editor.html` lets you build your own stages:
@@ -56,7 +69,8 @@ Each bar is 4 beats. Cell codes: `F` floor · `G` gap · `B` barrier · `M` pop-
 | --- | --- |
 | `#s=<base64 stage>` | Play a custom stage (the editor builds these links) |
 | `&from=<bar>` | Practice from a bar (0-based). Tempo, camera and gravity at that bar are applied |
-| `&auto=1` | Autoplay |
+| `#mode=challenge` | Challenge mode |
+| `&auto=1` | Autoplay (works in both modes, never recorded) |
 
 ## Running locally
 
