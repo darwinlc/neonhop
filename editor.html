@@ -162,7 +162,7 @@ kbd{font:600 10px Inter,sans-serif;background:#0b0418;border:1px solid var(--lin
 <div id="toast"></div>
 
 <script>
-// ---------------- constants shared with the game (keep in sync with Neon Hop.html) ----------------
+// ---------------- constants shared with the game (keep in sync with index.html) ----------------
 const H = 2.4;
 const CAMS = ['left', 'right', 'low', 'high'];
 const CAM_LABEL = { left: 'Cube left', right: 'Cube right', low: 'Low chase', high: 'High' };
@@ -514,7 +514,7 @@ $('fileIn').addEventListener('change', async e => {
     stopListen(); setStage(st); toast(`Imported “${st.name}”`);
   } catch (err) { toast('That file is not a Neon Hop stage'); }
 });
-const gameUrl = (extra = '') => new URL('Neon%20Hop.html', location.href).href + '#s=' + encodeStage(stage) + extra;
+const gameUrl = (extra = '') => new URL('index.html', location.href).href + '#s=' + encodeStage(stage) + extra;
 $('linkBtn').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(gameUrl()); toast('Play link copied'); } catch (e) { prompt('Copy this link:', gameUrl()); }
 });
