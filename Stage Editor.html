@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon Hop Stage Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07020f;--panel:#110725;--panel2:#1a0f33;--line:#2e1d55;--text:#e8f6ff;--dim:#8f86b0;--cyan:#00f0ff;--pink:#ff2bd6;--gold:#ffe46b;--red:#ff2b6a;--wall:#ff5c9a;--orange:#ff9a1c;--green:#6bff9e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:20;background:rgba(7,2,15,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.logo{font:800 15px Orbitron,sans-serif;letter-spacing:.08em;background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:6px;white-space:nowrap}
+.grow{flex:1}
+button{font:600 12px Inter,sans-serif;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--cyan)}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:linear-gradient(90deg,#00a7c2,#b41b98);border-color:transparent;color:#fff}
+button.on{border-color:var(--gold);color:var(--gold)}
+select,input{font:13px Inter,sans-serif;color:var(--text);background:#0b0418;border:1px solid var(--line);border-radius:7px;padding:6px 8px;min-width:0}
+select:focus,input:focus{outline:none;border-color:var(--cyan)}
+main{display:grid;grid-template-columns:270px 1fr;gap:16px;padding:16px;align-items:start}
+aside{position:sticky;top:70px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 86px);overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h3{margin:0 0 10px;font:800 11px Orbitron,sans-serif;letter-spacing:.2em;color:var(--dim)}
+.field{display:grid;grid-template-columns:78px minmax(0,1fr);align-items:center;gap:6px 8px;margin-bottom:8px}
+.field label{font-size:12px;color:var(--dim)}
+.row{display:flex;gap:6px}
+.row>*{flex:1}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tool{display:flex;align-items:center;gap:8px;text-align:left;padding:7px 8px}
+.tool .sw{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:800 10px Orbitron,sans-serif;flex:none}
+.tool small{display:block;color:var(--dim);font-weight:400;font-size:10px}
+.tool.active{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset,0 0 12px rgba(0,240,255,.25)}
+.hint{font-size:11px;color:var(--dim);line-height:1.5;margin-top:8px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat{background:#0b0418;border-radius:8px;padding:6px 8px}
+.stat b{display:block;font:800 15px Orbitron,sans-serif;color:var(--cyan)}
+.stat span{font-size:10px;color:var(--dim);letter-spacing:.06em}
+.notes{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px}
+.notes li{padding:6px 8px;border-radius:7px;background:#0b0418;border-left:3px solid var(--dim);line-height:1.4}
+.notes li.warn{border-color:var(--orange)}
+.notes li.ok{border-color:var(--green)}
+#profileWrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:14px}
+#profile{display:block;width:100%;height:150px;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--dim);padding:4px 4px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+#bars{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px}
+.bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px}
+.bar.sel{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,240,255,.25)}
+.bar.cpbar{border-top:3px solid var(--gold)}
+.bh{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.bh button{padding:3px 7px;font-size:11px;border-radius:6px}
+.bn{font:800 11px Orbitron,sans-serif!important;min-width:34px}
+.cpb{color:var(--dim)}
+.cpb.on{color:var(--gold);border-color:rgba(255,228,107,.5)}
+.bh .ops{margin-left:auto;display:flex;gap:3px;opacity:.35;transition:opacity .15s}
+.bar:hover .ops{opacity:1}
+.cells{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;touch-action:none}
+.cell{aspect-ratio:1;border-radius:8px;border:1px solid var(--line);background:#160b2c;display:grid;place-items:center;font:800 10px Orbitron,sans-serif;cursor:crosshair;position:relative;user-select:none;-webkit-user-select:none;transition:transform .06s}
+.cell .lb{pointer-events:none;text-align:center;line-height:1.2}
+.cell .lb small{display:block;font:600 8px Inter,sans-serif;opacity:.75;letter-spacing:.04em}
+.cell.c-F{color:#4b3a78}
+.cell.c-G{background:repeating-linear-gradient(135deg,#05010c 0 6px,#0a0318 6px 12px);border:1px dashed var(--cyan);color:var(--cyan)}
+.cell.c-B{background:rgba(255,43,106,.18);border-color:var(--red);color:var(--red)}
+.cell.c-M{background:rgba(255,92,154,.16);border-color:var(--wall);color:var(--wall)}
+.cell.c-D{background:rgba(255,154,28,.16);border-color:var(--orange);color:var(--orange)}
+.cell.c-U{background:rgba(107,255,158,.15);border-color:var(--green);color:var(--green)}
+.cell.flip{box-shadow:inset 0 -4px 0 rgba(107,255,158,.45)}
+.cell.flip::after{content:'⇅';position:absolute;top:1px;right:4px;font-size:9px;color:var(--green);opacity:.8}
+.cell.beat0::before{content:'';position:absolute;left:3px;top:3px;width:4px;height:4px;border-radius:50%;background:#fff;opacity:.35}
+.cell.ph{outline:2px solid #fff;transform:scale(1.07);z-index:1}
+.addbar{display:flex;flex-direction:column;gap:6px;justify-content:center;align-items:stretch;border:1px dashed var(--line);border-radius:12px;padding:10px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(340px,92vw)}
+dialog::backdrop{background:rgba(5,0,15,.7)}
+dialog h2{margin:0 0 6px;font:800 14px Orbitron,sans-serif;color:var(--gold);letter-spacing:.1em}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1d1040;border:1px solid var(--cyan);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+kbd{font:600 10px Inter,sans-serif;background:#0b0418;border:1px solid var(--line);border-radius:4px;padding:1px 4px}
+@media (max-width:800px){main{grid-template-columns:1fr;padding:12px}aside{position:static;max-height:none}header{padding:10px 12px}}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">NEON HOP · STAGE EDITOR</span>
+  <select id="libSel" title="Your stages"></select>
+  <button id="newBtn" title="New blank stage">New</button>
+  <button id="tplBtn" title="New stage copied from the built-in NEON RUN">From template</button>
+  <button id="dupStageBtn">Duplicate</button>
+  <button id="delStageBtn">Delete</button>
+  <span class="grow"></span>
+  <button id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
+  <button id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
+  <button id="importBtn">Import</button>
+  <button id="exportBtn">Export</button>
+  <button id="linkBtn" title="Copy a link that opens the game with this stage">Copy play link</button>
+  <input type="file" id="fileIn" accept=".json,application/json" hidden>
+</header>
+
+<main>
+<aside>
+  <div class="card">
+    <h3>STAGE</h3>
+    <div class="field"><label for="fName">Name</label><input id="fName" maxlength="40"></div>
+    <div class="field"><label for="fBpm">Start BPM</label><input id="fBpm" type="number" min="60" max="240" step="1"></div>
+    <div class="field"><label for="fCam">Start camera</label><select id="fCam"></select></div>
+    <div class="field"><label for="fSeed">Layout seed</label><div class="row"><input id="fSeed" type="number" step="1"><button id="seedBtn" title="Random seed" style="flex:none">🎲</button></div></div>
+  </div>
+
+  <div class="card">
+    <h3>PAINT</h3>
+    <div class="tools" id="tools"></div>
+    <div class="hint">Click or drag on cells to paint. Clicking a cell that already has the tool clears it. Right-click erases. Keys <kbd>1</kbd>–<kbd>6</kbd> pick a tool.</div>
+  </div>
+
+  <div class="card">
+    <h3>TEST</h3>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="primary" id="playBtn">▶ Play test</button>
+      <button id="playFromBtn">▶ Play from selected bar</button>
+      <button id="autoBtn">◉ Watch autoplay</button>
+      <button id="listenBtn">♪ Listen <kbd>Space</kbd></button>
+    </div>
+    <div class="hint">Click a bar number to select it (<kbd>Shift</kbd> for a range). <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste bars, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, <kbd>Del</kbd> delete.</div>
+  </div>
+
+  <div class="card">
+    <h3>STATS</h3>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <h3>NOTES</h3>
+    <ul class="notes" id="notes"></ul>
+  </div>
+</aside>
+
+<section>
+  <div id="profileWrap">
+    <canvas id="profile"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--cyan)"></i>platform surface</span>
+      <span><i style="background:var(--red)"></i>wall (jump)</span>
+      <span><i style="background:var(--orange)"></i>crusher (don't jump)</span>
+      <span><i style="background:var(--green)"></i>gravity portal / upside-down</span>
+      <span><i style="background:var(--gold)"></i>checkpoint / finish</span>
+    </div>
+  </div>
+  <div id="bars"></div>
+</section>
+</main>
+
+<dialog id="cpDlg">
+  <form method="dialog" id="cpForm">
+    <h2 id="cpTitle">CHECKPOINT</h2>
+    <div class="hint" style="margin:0 0 12px">The cube passes a gold gate at the start of this bar. The tempo and camera change right there.</div>
+    <div class="field"><label for="cpOn">Checkpoint</label><label style="color:var(--text)"><input type="checkbox" id="cpOn"> enabled</label></div>
+    <div class="field"><label for="cpBpm">New BPM</label><input id="cpBpm" type="number" min="60" max="240" placeholder="keep"></div>
+    <div class="field"><label for="cpCam">Camera</label><select id="cpCam"></select></div>
+    <div class="row" style="margin-top:14px"><button value="cancel">Cancel</button><button class="primary" value="ok" id="cpOk">Save</button></div>
+  </form>
+</dialog>
+<div id="toast"></div>
+
+<script>
+// ---------------- constants shared with the game (keep in sync with Neon Hop.html) ----------------
+const H = 2.4;
+const CAMS = ['left', 'right', 'low', 'high'];
+const CAM_LABEL = { left: 'Cube left', right: 'Cube right', low: 'Low chase', high: 'High' };
+const CELLS = {
+  F: { name: 'Floor', key: '1', color: '#4b3a78', glyph: '·', sub: '' },
+  G: { name: 'Gap', key: '2', color: '#00f0ff', glyph: 'GAP', sub: 'jump', jump: true },
+  B: { name: 'Barrier', key: '3', color: '#ff2b6a', glyph: '▮', sub: 'jump', jump: true },
+  M: { name: 'Pop-up wall', key: '4', color: '#ff5c9a', glyph: '↕', sub: 'jump', jump: true },
+  D: { name: 'Crusher', key: '5', color: '#ff9a1c', glyph: '✕', sub: 'no jump' },
+  U: { name: 'Gravity portal', key: '6', color: '#6bff9e', glyph: '⇅', sub: 'jump·flip', jump: true }
+};
+const ORDER = 'FGBMDU';
+const BUILTIN = {
+  id: 'neon-run-1', name: 'NEON RUN', bpm: 128, cam: 'left', seed: 7,
+  bars: ['FFFF','FFFF','GFFF','FFGF','GFGF','BFFF','FFBF','GFBF','MFFF','FFMF','GFMF','MFGF','BFMF','GFGF','MFMF','GFBF',
+    'FFDF','GFDF','FDGF','MFDF','DFGF','GDGF','BFDD','GFMD','FFFF','UFFF','GFGF','BFMF','GFDF','MFGF','GGFF','FDUF',
+    'FFFF','GFGG','MFDF','GBGF','DFMF','GGMF','UFGF','GFMF','DFGF','GGBF','MDGF','GFGG','BDMF','GGGF','FMDF','GUFF',
+    'GFGF','MFMF','GGGG','BGBG','MDMD','GGMF','DGDG','GFFF'],
+  checkpoints: [{ bar: 8, bpm: 136, cam: 'right' }, { bar: 16, bpm: 140, cam: 'low' }, { bar: 24, bpm: 144, cam: 'left' },
+    { bar: 32, bpm: 150, cam: 'right' }, { bar: 40, bpm: 156, cam: 'low' }, { bar: 48, bpm: 160, cam: 'high' }]
+};
+
+function sanitizeStage(o) {
+  if (!o || !Array.isArray(o.bars) || !o.bars.length) return null;
+  const clampBpm = v => Math.max(60, Math.min(240, Math.round(+v) || 128));
+  const bars = o.bars.slice(0, 999).map(b => String(b).toUpperCase().replace(/[^FGBMDU]/g, 'F').padEnd(4, 'F').slice(0, 4));
+  const checkpoints = (Array.isArray(o.checkpoints) ? o.checkpoints : [])
+    .map(c => ({ bar: Math.floor(+c.bar), bpm: c.bpm ? clampBpm(c.bpm) : undefined, cam: CAMS.includes(c.cam) ? c.cam : undefined }))
+    .filter(c => c.bar > 0 && c.bar < bars.length)
+    .filter((c, i, a) => a.findIndex(x => x.bar === c.bar) === i)
+    .sort((a, z) => a.bar - z.bar);
+  return { id: String(o.id || newId()).slice(0, 60), name: String(o.name || 'CUSTOM').slice(0, 40).toUpperCase(),
+    bpm: clampBpm(o.bpm), cam: CAMS.includes(o.cam) ? o.cam : 'left', seed: Math.floor(+o.seed) || 1, bars, checkpoints };
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const newId = () => 'st-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const encodeStage = st => btoa(unescape(encodeURIComponent(JSON.stringify(st)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------------- library (localStorage) ----------------
+const LS_LIB = 'neonhop-editor-stages', LS_CUR = 'neonhop-editor-current';
+let lib = {};
+try { lib = JSON.parse(localStorage.getItem(LS_LIB)) || {}; } catch (e) { lib = {}; }
+for (const k of Object.keys(lib)) { const s = sanitizeStage(lib[k]); if (s) lib[k] = s; else delete lib[k]; }
+function saveLib() { try { localStorage.setItem(LS_LIB, JSON.stringify(lib)); localStorage.setItem(LS_CUR, stage.id); } catch (e) {} }
+
+let stage, analysis, tool = 'G', sel = new Set(), anchor = null, clip = null, hist = [], fut = [];
+
+// ---------------- analysis: mirrors the game's generator ----------------
+function buildTempo(st) {
+  const tempo = [{ b: 0, t: 0, spb: 60 / st.bpm, bpm: st.bpm }];
+  for (const c of st.checkpoints) if (c.bpm) {
+    const p = tempo[tempo.length - 1], nb = c.bar * 4;
+    tempo.push({ b: nb, t: p.t + (nb - p.b) * p.spb, spb: 60 / c.bpm, bpm: c.bpm });
+  }
+  return tempo;
+}
+function segB(tempo, b) { let s = tempo[0]; for (const x of tempo) { if (x.b <= b) s = x; else break; } return s; }
+function secOfBeat(tempo, b) { if (b < 0) return b * tempo[0].spb; const s = segB(tempo, b); return s.t + (b - s.b) * s.spb; }
+function beatOfSec(tempo, t) { if (t < 0) return t / tempo[0].spb; let s = tempo[0]; for (const x of tempo) { if (x.t <= t) s = x; else break; } return s.b + (t - s.t) / s.spb; }
+
+function analyze(st) {
+  const nb = st.bars.length, tempo = buildTempo(st), rng = mulberry32(st.seed || 1);
+  const cps = {}; for (const c of st.checkpoints) cps[c.bar] = c;
+  let surf = 0, g = 1, x = 0, open = { s: -3, surf: 0, g: 1 };
+  const cellG = [], plats = [], props = [];
+  let jumps = 0, dodges = 0, flips = 0, chain = 0, maxChain = 0, maxChainBar = 0;
+  const chains = [];
+  for (let bar = 0; bar < nb; bar++) {
+    const pat = st.bars[bar];
+    for (let k = 0; k < 4; k++) {
+      const c = pat[k], i = bar * 4 + k; cellG[i] = g;
+      if (CELLS[c].jump) { jumps++; chain++; if (chain > maxChain) { maxChain = chain; maxChainBar = bar; } } else chain = 0;
+      if (chain === 8) chains.push(bar);
+      if (c === 'D') dodges++;
+      if (c === 'G' || c === 'U') {
+        open.e = i + .23; plats.push(open);
+        if (c === 'U') { props.push({ t: 'U', b: i + .5, y: surf + g * H }); surf += g * 2 * H; g = -g; flips++; }
+        else {
+          const nextF = k < 3 && pat[k + 1] === 'F';
+          x = Math.max(-6, Math.min(6, x + [-2, -1, 0, 1, 2][Math.floor(rng() * 5)]));
+          if (nextF && rng() < .45) surf -= g * 1.5;
+        }
+        open = { s: i + 1 - .3, surf, g };
+      } else if (c === 'B' || c === 'M' || c === 'D') props.push({ t: c, b: c === 'D' ? i + .5 : i + .37, y: surf, g });
+    }
+  }
+  open.e = nb * 4 + 6; plats.push(open);
+  const dur = secOfBeat(tempo, nb * 4);
+  const bpms = tempo.map(t => t.bpm);
+  const notes = [];
+  if (nb < 8) notes.push(['warn', 'Very short stage (under 8 bars).']);
+  if (CELLS[st.bars[0][0]].jump || st.bars[0][0] === 'D') notes.push(['warn', 'Bar 1 starts with an action right after “GO!”. A floor bar to warm up helps.']);
+  for (let i = 1; i < tempo.length; i++) if (Math.abs(tempo[i].bpm - tempo[i - 1].bpm) > 24)
+    notes.push(['warn', `Bar ${tempo[i].b / 4 + 1}: big tempo jump ${tempo[i - 1].bpm} → ${tempo[i].bpm} BPM.`]);
+  for (const b of chains) notes.push(['info', `Bar ${b + 1}: 8+ jumps in a row. Hard section.`]);
+  for (const c of st.checkpoints) if (!c.bpm && !c.cam) notes.push(['info', `Bar ${c.bar + 1}: checkpoint changes nothing (only shows a gate).`]);
+  if (g < 0) notes.push(['info', 'Stage ends upside-down. The finish runway will be on the ceiling.']);
+  if (!notes.length) notes.push(['ok', 'No issues found. Hit “Play test” to try it.']);
+  return { tempo, dur, cellG, plats, props, jumps, dodges, flips, maxChain, maxChainBar, endG: g, cps, notes, minBpm: Math.min(...bpms), maxBpm: Math.max(...bpms) };
+}
+
+// ---------------- history ----------------
+function setStage(st, keepHist) {
+  stage = st; sel.clear(); anchor = null;
+  if (!keepHist) { hist = [JSON.stringify(stage)]; fut = []; }
+  lib[stage.id] = stage; saveLib(); renderAll();
+}
+function commit() {
+  stage = sanitizeStage(stage);
+  const js = JSON.stringify(stage);
+  if (hist[hist.length - 1] !== js) { hist.push(js); if (hist.length > 150) hist.shift(); fut = []; }
+  lib[stage.id] = stage; saveLib(); renderAll();
+}
+function undo() { if (hist.length < 2) return; fut.push(hist.pop()); stage = JSON.parse(hist[hist.length - 1]); lib[stage.id] = stage; saveLib(); renderAll(); }
+function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); stage = JSON.parse(s); lib[stage.id] = stage; saveLib(); renderAll(); }
+
+// ---------------- rendering ----------------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function renderAll() {
+  analysis = analyze(stage);
+  renderLib(); renderFields(); renderTools(); renderBars(); renderStats(); drawProfile();
+  $('undoBtn').disabled = hist.length < 2; $('redoBtn').disabled = !fut.length;
+  $('playFromBtn').disabled = !sel.size;
+  $('delStageBtn').disabled = Object.keys(lib).length < 2;
+}
+function renderLib() {
+  const ids = Object.keys(lib).sort((a, b) => lib[a].name.localeCompare(lib[b].name));
+  $('libSel').innerHTML = ids.map(id => `<option value="${esc(id)}"${id === stage.id ? ' selected' : ''}>${esc(lib[id].name)}</option>`).join('');
+}
+function renderFields() {
+  const a = document.activeElement;
+  if (a !== $('fName')) $('fName').value = stage.name;
+  if (a !== $('fBpm')) $('fBpm').value = stage.bpm;
+  if (a !== $('fSeed')) $('fSeed').value = stage.seed;
+  $('fCam').value = stage.cam;
+}
+function renderTools() {
+  $('tools').innerHTML = [...ORDER].map(c => { const d = CELLS[c];
+    return `<button class="tool${tool === c ? ' active' : ''}" data-tool="${c}"><span class="sw cell c-${c}" style="aspect-ratio:auto">${d.glyph}</span><span>${d.name}<small>${d.key} · ${d.sub || 'nothing'}</small></span></button>`; }).join('');
+}
+function cellHtml(c, i, g) {
+  const d = CELLS[c];
+  return `<div class="cell c-${c}${g < 0 ? ' flip' : ''}${i % 4 === 0 ? ' beat0' : ''}" data-i="${i}"><span class="lb">${d.glyph}${d.sub ? `<small>${d.sub}</small>` : ''}</span></div>`;
+}
+function renderBars() {
+  const a = analysis;
+  let h = '';
+  stage.bars.forEach((pat, b) => {
+    const cp = a.cps[b];
+    let cpTxt = '◇';
+    if (b === 0) cpTxt = `START · ${stage.bpm}`;
+    else if (cp) cpTxt = '◆ ' + [cp.bpm ? cp.bpm : '', cp.cam ? cp.cam.toUpperCase() : ''].filter(Boolean).join(' · ');
+    h += `<div class="bar${sel.has(b) ? ' sel' : ''}${cp ? ' cpbar' : ''}" data-bar="${b}">
+      <div class="bh"><button class="bn" data-act="sel" title="Select bar">${b + 1}</button>
+        <button class="cpb${cp || b === 0 ? ' on' : ''}" data-act="cp" title="${b === 0 ? 'Start settings are in the STAGE panel' : 'Checkpoint: tempo / camera change'}">${cpTxt}</button>
+        <span class="ops"><button data-act="ins" title="Insert empty bar after">＋</button><button data-act="dup" title="Duplicate bar">⧉</button><button data-act="del" title="Delete bar">✕</button></span></div>
+      <div class="cells">${[...pat].map((c, k) => cellHtml(c, b * 4 + k, a.cellG[b * 4 + k])).join('')}</div></div>`;
+  });
+  h += `<div class="addbar"><button data-act="add1">＋ Add bar</button><button data-act="add4">＋ Add 4 bars</button></div>`;
+  $('bars').innerHTML = h;
+}
+function fmtTime(s) { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function renderStats() {
+  const a = analysis, mins = a.dur / 60;
+  const items = [
+    ['Bars', stage.bars.length], ['Length', fmtTime(a.dur)],
+    ['BPM', a.minBpm === a.maxBpm ? a.minBpm : `${a.minBpm}–${a.maxBpm}`], ['Checkpoints', stage.checkpoints.length],
+    ['Jumps', a.jumps], ['Dodges', a.dodges], ['Flips', a.flips], ['Jumps / min', mins ? Math.round(a.jumps / mins) : 0]
+  ];
+  $('stats').innerHTML = items.map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k.toUpperCase()}</span></div>`).join('');
+  $('notes').innerHTML = a.notes.map(([t, m]) => `<li class="${t}">${esc(m)}</li>`).join('');
+}
+
+// side-view profile of the whole stage
+const pcv = $('profile'), pctx = pcv.getContext('2d');
+let playBeat = -1;
+function profGeom() {
+  const w = pcv.clientWidth, h = 150, total = stage.bars.length * 4 + 3, pad = 10;
+  let lo = Infinity, hi = -Infinity;
+  for (const p of analysis.plats) { lo = Math.min(lo, p.surf); hi = Math.max(hi, p.surf); }
+  lo -= 2.2; hi += H + 1.4;
+  const bx = (w - pad * 2) / total, ys = (h - 26) / Math.max(6, hi - lo);
+  return { w, h, pad, bx, X: b => pad + (b + 1) * bx, Y: y => h - 14 - (y - lo) * ys, ys };
+}
+function drawProfile() {
+  const dpr = devicePixelRatio || 1, G = profGeom();
+  pcv.width = G.w * dpr; pcv.height = G.h * dpr; pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const c = pctx, nb = stage.bars.length, a = analysis;
+  c.clearRect(0, 0, G.w, G.h);
+  // upside-down regions
+  c.fillStyle = 'rgba(107,255,158,.07)';
+  for (let i = 0; i < nb * 4; i++) if (a.cellG[i] < 0) c.fillRect(G.X(i), 0, G.bx + .5, G.h - 12);
+  // selection
+  c.fillStyle = 'rgba(0,240,255,.12)';
+  for (const b of sel) c.fillRect(G.X(b * 4), 0, G.bx * 4, G.h - 12);
+  // bar ticks
+  c.font = '600 9px Inter, sans-serif'; c.textAlign = 'center';
+  for (let b = 0; b <= nb; b++) {
+    c.fillStyle = b % 4 === 0 ? 'rgba(143,134,176,.35)' : 'rgba(143,134,176,.12)';
+    c.fillRect(G.X(b * 4), G.h - 12, 1, b % 4 === 0 ? 8 : 4);
+    if (b % 4 === 0 && b < nb && G.bx * 16 > 22) { c.fillStyle = '#8f86b0'; c.fillText(b + 1, G.X(b * 4) + 6, G.h - 1); }
+  }
+  // checkpoints + finish
+  c.setLineDash([3, 3]); c.lineWidth = 1;
+  for (const cp of stage.checkpoints) { c.strokeStyle = 'rgba(255,228,107,.7)'; c.beginPath(); c.moveTo(G.X(cp.bar * 4), 0); c.lineTo(G.X(cp.bar * 4), G.h - 12); c.stroke();
+    if (cp.bpm) { c.fillStyle = '#ffe46b'; c.textAlign = 'left'; c.fillText(cp.bpm, G.X(cp.bar * 4) + 3, 10); } }
+  c.setLineDash([]);
+  c.strokeStyle = '#ffe46b'; c.lineWidth = 2; c.beginPath(); c.moveTo(G.X(nb * 4), 0); c.lineTo(G.X(nb * 4), G.h - 12); c.stroke();
+  // platforms: bright line = walking surface, dim block = body on the other side
+  for (const p of a.plats) {
+    const x0 = G.X(Math.max(-1, p.s)), x1 = G.X(Math.min(nb * 4 + 2, p.e)), y = G.Y(p.surf), th = .6 * G.ys;
+    c.fillStyle = 'rgba(42,26,74,.9)'; c.fillRect(x0, p.g > 0 ? y : y - th, x1 - x0, th);
+    c.fillStyle = p.g > 0 ? '#00f0ff' : '#6bff9e'; c.fillRect(x0, y - 1, x1 - x0, 2);
+  }
+  // props
+  for (const o of a.props) {
+    const x = G.X(o.b);
+    if (o.t === 'U') { c.strokeStyle = '#6bff9e'; c.lineWidth = 2; c.beginPath(); c.arc(x, G.Y(o.y), Math.max(3, 1.3 * G.ys), 0, Math.PI * 2); c.stroke(); continue; }
+    const hgt = o.t === 'D' ? .9 : o.t === 'M' ? 1.1 : .7, base = o.t === 'D' ? 1.05 : 0;
+    const y0 = G.Y(o.y + o.g * base), y1 = G.Y(o.y + o.g * (base + hgt));
+    c.fillStyle = o.t === 'D' ? '#ff9a1c' : o.t === 'M' ? '#ff5c9a' : '#ff2b6a';
+    c.fillRect(x - Math.max(1.5, G.bx * .18), Math.min(y0, y1), Math.max(3, G.bx * .36), Math.max(2, Math.abs(y1 - y0)));
+  }
+  if (playBeat >= 0) { c.fillStyle = '#fff'; c.fillRect(G.X(playBeat), 0, 2, G.h - 12); }
+}
+addEventListener('resize', drawProfile);
+pcv.addEventListener('click', e => {
+  const G = profGeom(), b = Math.floor(((e.offsetX - G.pad) / G.bx - 1) / 4);
+  if (b < 0 || b >= stage.bars.length) return;
+  sel = new Set([b]); anchor = b; renderAll();
+  document.querySelector(`.bar[data-bar="${b}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+// ---------------- editing ----------------
+function setCell(i, v) {
+  const b = Math.floor(i / 4), k = i % 4, p = stage.bars[b];
+  if (p[k] === v) return false;
+  stage.bars[b] = p.slice(0, k) + v + p.slice(k + 1);
+  const el = document.querySelector(`.cell[data-i="${i}"]`);
+  if (el) el.outerHTML = cellHtml(v, i, analysis.cellG[i]);
+  return true;
+}
+let painting = null;
+$('bars').addEventListener('pointerdown', e => {
+  const cell = e.target.closest('.cell'); if (!cell) return;
+  e.preventDefault();
+  const i = +cell.dataset.i, cur = stage.bars[Math.floor(i / 4)][i % 4];
+  const v = e.button === 2 ? 'F' : cur === tool ? 'F' : tool;
+  painting = { v, changed: setCell(i, v) };
+});
+addEventListener('pointermove', e => {
+  if (!painting) return;
+  const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('.cell');
+  if (cell && setCell(+cell.dataset.i, painting.v)) painting.changed = true;
+});
+addEventListener('pointerup', () => { if (painting) { const ch = painting.changed; painting = null; if (ch) commit(); } });
+$('bars').addEventListener('contextmenu', e => { if (e.target.closest('.cell')) e.preventDefault(); });
+
+function shiftCheckpoints(fromBar, delta) { for (const c of stage.checkpoints) if (c.bar >= fromBar) c.bar += delta; }
+function insertBars(after, bars) { stage.bars.splice(after + 1, 0, ...bars); shiftCheckpoints(after + 1, bars.length); }
+function deleteBars(set) {
+  const list = [...set].sort((a, b) => b - a);
+  if (list.length >= stage.bars.length) { toast('A stage needs at least one bar'); return false; }
+  for (const b of list) {
+    stage.bars.splice(b, 1);
+    stage.checkpoints = stage.checkpoints.filter(c => c.bar !== b);
+    for (const c of stage.checkpoints) if (c.bar > b) c.bar--;
+  }
+  return true;
+}
+const selSorted = () => [...sel].sort((a, b) => a - b);
+function copySel() { if (!sel.size) return; clip = selSorted().map(b => stage.bars[b]); toast(`Copied ${clip.length} bar${clip.length > 1 ? 's' : ''}`); }
+function pasteSel() {
+  if (!clip) return;
+  const at = sel.size ? Math.max(...sel) : stage.bars.length - 1;
+  insertBars(at, clip.slice());
+  sel = new Set(clip.map((_, j) => at + 1 + j)); commit();
+}
+function dupSel() { if (!sel.size) return; clip = selSorted().map(b => stage.bars[b]); pasteSel(); }
+function delSel() { if (!sel.size) return; if (deleteBars(sel)) { sel.clear(); commit(); } }
+
+$('bars').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const barEl = btn.closest('.bar'), b = barEl ? +barEl.dataset.bar : -1, act = btn.dataset.act;
+  if (act === 'sel') {
+    if (e.shiftKey && anchor !== null) { sel = new Set(); for (let j = Math.min(anchor, b); j <= Math.max(anchor, b); j++) sel.add(j); }
+    else if (e.ctrlKey || e.metaKey) { sel.has(b) ? sel.delete(b) : sel.add(b); anchor = b; }
+    else { sel = sel.size === 1 && sel.has(b) ? new Set() : new Set([b]); anchor = b; }
+    renderAll();
+  } else if (act === 'cp') { if (b === 0) { $('fBpm').focus(); toast('Start tempo & camera are in the STAGE panel'); } else openCp(b); }
+  else if (act === 'ins') { insertBars(b, ['FFFF']); commit(); }
+  else if (act === 'dup') { insertBars(b, [stage.bars[b]]); commit(); }
+  else if (act === 'del') { if (deleteBars(new Set([b]))) { sel.clear(); commit(); } }
+  else if (act === 'add1') { stage.bars.push('FFFF'); commit(); }
+  else if (act === 'add4') { stage.bars.push('FFFF', 'FFFF', 'FFFF', 'FFFF'); commit(); }
+});
+
+// checkpoint dialog
+const camOpts = (keep) => (keep ? '<option value="">keep</option>' : '') + CAMS.map(c => `<option value="${c}">${CAM_LABEL[c]}</option>`).join('');
+$('cpCam').innerHTML = camOpts(true); $('fCam').innerHTML = camOpts(false);
+let cpBar = 0;
+function openCp(b) {
+  cpBar = b; const cp = stage.checkpoints.find(c => c.bar === b);
+  $('cpTitle').textContent = `CHECKPOINT · BAR ${b + 1}`;
+  $('cpOn').checked = true;
+  $('cpBpm').value = cp?.bpm || ''; $('cpCam').value = cp?.cam || '';
+  $('cpDlg').showModal();
+}
+$('cpDlg').addEventListener('close', () => {
+  if ($('cpDlg').returnValue !== 'ok') return;
+  stage.checkpoints = stage.checkpoints.filter(c => c.bar !== cpBar);
+  if ($('cpOn').checked) stage.checkpoints.push({ bar: cpBar, bpm: +$('cpBpm').value || undefined, cam: $('cpCam').value || undefined });
+  commit();
+});
+
+// stage fields
+$('fName').addEventListener('change', e => { stage.name = e.target.value || 'UNTITLED'; commit(); });
+$('fBpm').addEventListener('change', e => { stage.bpm = +e.target.value; commit(); });
+$('fCam').addEventListener('change', e => { stage.cam = e.target.value; commit(); });
+$('fSeed').addEventListener('change', e => { stage.seed = +e.target.value; commit(); });
+$('seedBtn').addEventListener('click', () => { stage.seed = 1 + Math.floor(Math.random() * 99999); commit(); });
+$('tools').addEventListener('click', e => { const t = e.target.closest('[data-tool]'); if (t) { tool = t.dataset.tool; renderTools(); } });
+
+// library
+$('libSel').addEventListener('change', e => { stopListen(); setStage(clone(lib[e.target.value])); });
+$('newBtn').addEventListener('click', () => { stopListen(); setStage({ id: newId(), name: 'UNTITLED', bpm: 128, cam: 'left', seed: 1 + Math.floor(Math.random() * 99999), bars: ['FFFF', 'FFFF', 'GFFF', 'FFGF', 'GFGF', 'FFFF', 'FFFF', 'FFFF'], checkpoints: [] }); });
+$('tplBtn').addEventListener('click', () => { stopListen(); setStage({ ...clone(BUILTIN), id: newId(), name: 'NEON RUN REMIX' }); });
+$('dupStageBtn').addEventListener('click', () => { setStage({ ...clone(stage), id: newId(), name: (stage.name + ' COPY').slice(0, 40) }); toast('Duplicated'); });
+$('delStageBtn').addEventListener('click', () => {
+  if (Object.keys(lib).length < 2) return;
+  if (!confirm(`Delete “${stage.name}”? This can't be undone.`)) return;
+  delete lib[stage.id]; stopListen(); setStage(clone(lib[Object.keys(lib)[0]]));
+});
+$('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(stage, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = stage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.neonhop.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('importBtn').addEventListener('click', () => $('fileIn').click());
+$('fileIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const st = sanitizeStage(JSON.parse(await f.text()));
+    if (!st) throw 0;
+    if (lib[st.id]) st.id = newId();
+    stopListen(); setStage(st); toast(`Imported “${st.name}”`);
+  } catch (err) { toast('That file is not a Neon Hop stage'); }
+});
+const gameUrl = (extra = '') => new URL('Neon%20Hop.html', location.href).href + '#s=' + encodeStage(stage) + extra;
+$('linkBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(gameUrl()); toast('Play link copied'); } catch (e) { prompt('Copy this link:', gameUrl()); }
+});
+function openGame(extra) { stopListen(); window.open(gameUrl(extra), 'neonhop-test'); }
+$('playBtn').addEventListener('click', () => openGame(''));
+$('playFromBtn').addEventListener('click', () => { if (sel.size) openGame(`&from=${Math.min(...sel)}`); });
+$('autoBtn').addEventListener('click', () => openGame(sel.size ? `&from=${Math.min(...sel)}&auto=1` : '&auto=1'));
+$('undoBtn').addEventListener('click', undo); $('redoBtn').addEventListener('click', redo);
+
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 1600); }
+
+// ---------------- audio preview ----------------
+let ac, master, nbuf, pv = null;
+function initAudio() {
+  if (ac) return;
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  master = ac.createGain(); master.gain.value = .6; master.connect(ac.destination);
+  nbuf = ac.createBuffer(1, ac.sampleRate / 2, ac.sampleRate);
+  const d = nbuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function tone(t, type, f, peak, dec, f2) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dec * .6);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + .003); g.gain.exponentialRampToValueAtTime(.0001, t + dec);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dec + .05);
+}
+function noise(t, type, freq, peak, dec) {
+  const s = ac.createBufferSource(); s.buffer = nbuf; const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = ac.createGain(); g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(.0001, t + dec);
+  s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + dec + .05);
+}
+function listen() {
+  if (pv) return stopListen();
+  initAudio(); ac.resume();
+  const from = sel.size ? Math.min(...sel) * 4 : 0;
+  pv = { t0: ac.currentTime + .15 - secOfBeat(analysis.tempo, from), next: from, cur: -1 };
+  pv.timer = setInterval(sched, 25); sched(); requestAnimationFrame(tick);
+  $('listenBtn').classList.add('on'); $('listenBtn').innerHTML = '■ Stop <kbd>Space</kbd>';
+}
+function stopListen() {
+  if (!pv) return;
+  clearInterval(pv.timer); pv = null; playBeat = -1;
+  document.querySelectorAll('.cell.ph').forEach(e => e.classList.remove('ph'));
+  $('listenBtn').classList.remove('on'); $('listenBtn').innerHTML = '♪ Listen <kbd>Space</kbd>';
+  drawProfile();
+}
+function sched() {
+  const end = stage.bars.length * 4, tempo = analysis.tempo;
+  while (pv && pv.next < end && pv.t0 + secOfBeat(tempo, pv.next) < ac.currentTime + .2) {
+    const k = pv.next, tb = pv.t0 + secOfBeat(tempo, k), spb = segB(tempo, k).spb, c = stage.bars[Math.floor(k / 4)][k % 4];
+    tone(tb, 'sine', 150, .7, .25, 45); noise(tb + spb / 2, 'highpass', 7000, .12, .05);
+    if (k % 4 === 0 && analysis.cps[k / 4]) tone(tb, 'triangle', 1760, .15, .5);
+    if (CELLS[c].jump) { tone(tb, 'sine', 1318.5, .22, .2); tone(tb, 'sine', 1975.5, .12, .16); }
+    if (c === 'U') tone(tb, 'sine', 500, .1, .4, 2200);
+    if (c === 'D') { tone(tb, 'square', 196, .08, .12); tone(tb + spb / 2, 'sine', 95, .5, .2, 38); }
+    pv.next++;
+  }
+}
+function tick() {
+  if (!pv) return;
+  const end = stage.bars.length * 4, beat = beatOfSec(analysis.tempo, ac.currentTime - pv.t0);
+  if (beat >= end + .5) return stopListen();
+  const i = Math.floor(beat);
+  if (i !== pv.cur && i >= 0) {
+    document.querySelectorAll('.cell.ph').forEach(e => e.classList.remove('ph'));
+    const el = document.querySelector(`.cell[data-i="${i}"]`); el?.classList.add('ph');
+    if (i % 4 === 0) el?.closest('.bar')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    pv.cur = i;
+  }
+  playBeat = Math.max(0, beat); drawProfile();
+  requestAnimationFrame(tick);
+}
+$('listenBtn').addEventListener('click', listen);
+
+// ---------------- keyboard ----------------
+addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea,dialog')) return;
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+  else if (mod && k === 'c') { e.preventDefault(); copySel(); }
+  else if (mod && k === 'v') { e.preventDefault(); pasteSel(); }
+  else if (mod && k === 'd') { e.preventDefault(); dupSel(); }
+  else if (!mod && (e.key === 'Delete' || e.key === 'Backspace')) { if (sel.size) { e.preventDefault(); delSel(); } }
+  else if (e.key === ' ') { e.preventDefault(); listen(); }
+  else if (e.key === 'Escape') { sel.clear(); renderAll(); }
+  else if (!mod && /^[1-6]$/.test(e.key)) { tool = ORDER[+e.key - 1]; renderTools(); }
+});
+
+// ---------------- boot ----------------
+if (!Object.keys(lib).length) { const s = { ...clone(BUILTIN), id: newId(), name: 'NEON RUN REMIX' }; lib[s.id] = s; }
+let curId = null; try { curId = localStorage.getItem(LS_CUR); } catch (e) {}
+setStage(clone(lib[curId] || lib[Object.keys(lib)[0]]));
+</script>
+</body>
+</html>
